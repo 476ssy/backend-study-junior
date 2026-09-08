@@ -8,8 +8,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,124 +26,34 @@ import java.util.List;
 @RequestMapping("/attendance")
 public class AttendanceController {
 
-    private static final LocalTime LATE_CUTOFF = LocalTime.of(9, 10);
-    private static final LocalTime ABSENT_CUTOFF = LocalTime.of(9, 30);
+    private final AttendanceService attendanceService;
 
-    private final List<Attendance> attendances = new ArrayList<>();
-    private long nextId = 1L;
-
-    public static class Attendance {
-        private Long id;
-        private String studentName;
-        private LocalTime checkInTime;
-        private String status;
-
-        public Attendance() {
-        }
-
-        public Attendance(Long id, String studentName, LocalTime checkInTime, String status) {
-            this.id = id;
-            this.studentName = studentName;
-            this.checkInTime = checkInTime;
-            this.status = status;
-        }
-
-        public Long getId() {
-            return id;
-        }
-
-        public void setId(Long id) {
-            this.id = id;
-        }
-
-        public String getStudentName() {
-            return studentName;
-        }
-
-        public void setStudentName(String studentName) {
-            this.studentName = studentName;
-        }
-
-        public LocalTime getCheckInTime() {
-            return checkInTime;
-        }
-
-        public void setCheckInTime(LocalTime checkInTime) {
-            this.checkInTime = checkInTime;
-        }
-
-        public String getStatus() {
-            return status;
-        }
-
-        public void setStatus(String status) {
-            this.status = status;
-        }
+    public AttendanceController(AttendanceService attendanceService) {
+        this.attendanceService = attendanceService;
     }
 
     @PostMapping("/check-in")
     public Attendance checkIn(@RequestBody Attendance request) {
-        String status;
-        if (!request.getCheckInTime().isAfter(LATE_CUTOFF)) {
-            status = "ON_TIME";
-        } else if (!request.getCheckInTime().isAfter(ABSENT_CUTOFF)) {
-            status = "LATE";
-        } else {
-            status = "ABSENT";
-        }
-
-        Attendance attendance = new Attendance(nextId++, request.getStudentName(), request.getCheckInTime(), status);
-        attendances.add(attendance);
-        return attendance;
+        return attendanceService.checkIn(request);
     }
 
     @GetMapping
     public List<Attendance> getAttendances() {
-        return attendances;
+        return attendanceService.getAttendances();
     }
 
     @GetMapping("/{id}")
     public Attendance getAttendance(@PathVariable Long id) {
-        for (Attendance attendance : attendances) {
-            if (attendance.getId().equals(id)) {
-                return attendance;
-            }
-        }
-        return null;
+        return attendanceService.getAttendance(id);
     }
 
     @GetMapping("/late-count")
     public long countLate() {
-        long count = 0;
-        for (Attendance attendance : attendances) {
-            if ("LATE".equals(attendance.getStatus())) {
-                count++;
-            }
-        }
-        return count;
+        return attendanceService.countLate();
     }
 
-    // 관리자가 잘못 입력된 출석 시각을 정정하는 API.
-    // 지각 판정 로직을 checkIn()과 별개로 다시 구현하다가 경계값 조건(<= vs <)이 미묘하게 달라졌다.
     @PutMapping("/{id}")
     public Attendance updateCheckInTime(@PathVariable Long id, @RequestBody Attendance request) {
-        Attendance attendance = getAttendance(id);
-        if (attendance == null) {
-            return null;
-        }
-
-        attendance.setCheckInTime(request.getCheckInTime());
-
-        String status;
-        if (request.getCheckInTime().isBefore(LATE_CUTOFF)) {
-            status = "ON_TIME";
-        } else if (request.getCheckInTime().isBefore(ABSENT_CUTOFF)) {
-            status = "LATE";
-        } else {
-            status = "ABSENT";
-        }
-        attendance.setStatus(status);
-
-        return attendance;
+        return attendanceService.updateCheckInTime(id, request);
     }
 }
